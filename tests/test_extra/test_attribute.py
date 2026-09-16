@@ -1,5 +1,7 @@
 """Test attribute selectors."""
 from .. import util
+import threading
+import soupsieve as sv
 
 
 class TestAttribute(util.TestCase):
@@ -50,3 +52,26 @@ class TestAttribute(util.TestCase):
             ["div", "0", "1", "2", "3", "pre", "4", "6"],
             flags=util.HTML5
         )
+
+    def test_bad_attribute_unclused(self):
+        """Test bad attribute fails for syntax error, not timeout error."""
+
+        results = {}
+
+        def compile_unclosed_attribute():
+            """Compile a selector with an unclosed, quoted attribute value."""
+
+            try:
+                sv.compile('[a="' + ('x' * 300))
+            except sv.SelectorSyntaxError:
+                results['syntax_error'] = True
+            except Exception:
+                results['syntax_error'] = False
+
+        # Run in a thread so a catastrophic backtracking case cannot hang the test suite.
+        thread = threading.Thread(target=compile_unclosed_attribute, daemon=True)
+        thread.start()
+        thread.join(timeout=10)
+
+        self.assertFalse(thread.is_alive())
+        self.assertTrue(results.get('syntax_error', False))
